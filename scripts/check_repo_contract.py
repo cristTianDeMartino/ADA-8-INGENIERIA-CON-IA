@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic contract verification for ADA-08 Agent-Ready Repository."""
+"""Deterministic contract and security verification for ADA-09 Agentic Code Review."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -12,7 +12,7 @@ REQUIRED_FILES = [
     "SPEC.md",
     "ARCHITECTURE.md",
     "TASKS.md",
-    "TASK_UNDER_TEST.md",
+    "CHANGE_REQUEST.md",
     "docs/REPO_MAP.md",
     "scripts/verify_repo.sh",
     ".github/workflows/verify.yml",
@@ -54,6 +54,18 @@ def check_spec_references() -> list[str]:
         errors.append("SPEC.md does not reference any functional requirements (FR-*)")
     if "AC-" not in content:
         errors.append("SPEC.md does not reference any acceptance criteria (AC-*)")
+    return errors
+
+
+def check_change_request_contract() -> list[str]:
+    cr_path = Path("CHANGE_REQUEST.md")
+    if not cr_path.exists():
+        return []
+    content = cr_path.read_text(encoding="utf-8")
+    errors = []
+    for required_token in ["Change ID:", "## Goal", "## Requirements Covered", "FR-", "AC-", "Approved to implement: YES"]:
+        if required_token not in content:
+            errors.append(f"CHANGE_REQUEST.md is missing required element: '{required_token}'")
     return errors
 
 
@@ -103,21 +115,33 @@ def check_protected_fixtures() -> list[str]:
 
 
 def main() -> int:
-    all_errors = []
-    all_errors.extend(check_required_files())
-    all_errors.extend(check_directories())
-    all_errors.extend(check_spec_references())
-    all_errors.extend(check_agents_contract())
-    all_errors.extend(check_forbidden_files())
-    all_errors.extend(check_protected_fixtures())
+    contract_errors = []
+    contract_errors.extend(check_required_files())
+    contract_errors.extend(check_directories())
+    contract_errors.extend(check_spec_references())
+    contract_errors.extend(check_change_request_contract())
+    contract_errors.extend(check_agents_contract())
+    contract_errors.extend(check_protected_fixtures())
 
-    if all_errors:
-        print("REPO_CONTRACT: FAIL")
-        for err in all_errors:
+    security_errors = check_forbidden_files()
+
+    if contract_errors:
+        print("Repository Contract: FAIL")
+        for err in contract_errors:
             print(f"  - {err}")
+    else:
+        print("Repository Contract: PASS")
+
+    if security_errors:
+        print("Security Check: FAIL")
+        for err in security_errors:
+            print(f"  - {err}")
+    else:
+        print("Security Check: PASS")
+
+    if contract_errors or security_errors:
         return 1
 
-    print("REPO_CONTRACT: PASS")
     return 0
 
 
